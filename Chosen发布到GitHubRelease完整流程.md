@@ -7,7 +7,7 @@
 软件包对象和地址：
 
 - R2 对象：wogua/Chosen2.10.zip
-- R2 公网地址：https://skin.chosen.cc.cd/wogua/Chosen2.10.zip
+- R2 公网地址：https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip
 - 主下载地址：R2 公网地址。
 - 备用下载地址：v4、cdn、v6 GitHub Release 代理，均指向 v2.10 的同一个附件。
 
@@ -178,7 +178,7 @@ manifest 字段：
 ```json
 {
   "version": "2.10",
-  "download_url": "https://skin.chosen.cc.cd/wogua/Chosen2.10.zip",
+  "download_url": "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
   "download_url_backup": [
     "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.10/Chosen2.10.zip",
     "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.10/Chosen2.10.zip",

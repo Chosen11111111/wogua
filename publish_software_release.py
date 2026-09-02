@@ -33,7 +33,7 @@ else:
 
 OWNER = "Chosen11111111"
 REPOSITORY = "wogua"
-R2_PUBLIC_BASE_URL = "https://skin.chosen.cc.cd/wogua"
+R2_PUBLIC_BASE_URL = "https://cdn.chosen.cc.cd/wogua"
 R2_OBJECT_PREFIX = "wogua"
 PROXY_PREFIX = "https://v4.gh-proxy.org/"
 BACKUP_PREFIXES = ("https://cdn.gh-proxy.org/", "https://v6.gh-proxy.org/")

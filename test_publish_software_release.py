@@ -93,12 +93,12 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
     def test_r2_paths_use_wogua_prefix_and_versioned_asset_name(self):
         info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
         self.assertEqual(r2_object_key(info), "wogua/Chosen2.10.zip")
-        self.assertEqual(r2_public_url(info), "https://skin.chosen.cc.cd/wogua/Chosen2.10.zip")
+        self.assertEqual(r2_public_url(info), "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip")
 
     def test_build_manifest_puts_r2_first_and_github_proxies_after_it(self):
         info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
         manifest = build_manifest(info)
-        self.assertEqual(manifest["download_url"], "https://skin.chosen.cc.cd/wogua/Chosen2.10.zip")
+        self.assertEqual(manifest["download_url"], "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip")
         self.assertEqual(manifest["size"], 219176976)
         self.assertEqual(manifest["release_tag"], "v2.10")
         self.assertEqual(len(manifest["download_url_backup"]), 3)
@@ -138,7 +138,7 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
     def test_public_range_check_requires_206_and_exact_content_range(self):
         response = FakeHttpResponse(206, {"Content-Range": "bytes 0-0/219176976", "Content-Length": "1"})
         result = check_download_range(
-            "https://skin.chosen.cc.cd/wogua/Chosen2.10.zip",
+            "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
             219176976,
             http_get=lambda *args, **kwargs: response,
         )
@@ -149,7 +149,7 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
         response = FakeHttpResponse(200, {"Content-Length": "219176976"})
         with self.assertRaises(ReleaseError):
             check_download_range(
-                "https://skin.chosen.cc.cd/wogua/Chosen2.10.zip",
+                "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
                 219176976,
                 http_get=lambda *args, **kwargs: response,
             )
