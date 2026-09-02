@@ -1,12 +1,12 @@
 {
-  "version": "2.11",
-  "download_url": "https://cdn.chosen.cc.cd/wogua/Chosen2.11.zip",
+  "version": "2.12",
+  "download_url": "https://cdn.chosen.cc.cd/wogua/Chosen2.12.zip",
   "download_url_backup": [
-    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.11/Chosen2.11.zip",
-    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.11/Chosen2.11.zip",
-    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.11/Chosen2.11.zip"
+    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.12/Chosen2.12.zip",
+    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.12/Chosen2.12.zip",
+    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.12/Chosen2.12.zip"
   ],
-  "size": 219204821,
-  "sha256": "ba0dd7b2f81bfb35a34c14975ef4675d447d4dda3e84815de35a23e2739c0693",
-  "release_tag": "v2.11"
+  "size": 219217522,
+  "sha256": "8ce224c9c780b953eb1e77008438f038d33eaece8afe28bc0439a4a28ea62e81",
+  "release_tag": "v2.12"
 }
