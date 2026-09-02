@@ -11,12 +11,24 @@
 - 主下载地址：R2 公网地址。
 - 备用下载地址：v4、cdn、v6 GitHub Release 代理，均指向 v2.10 的同一个附件。
 
-发布顺序：先用 publish_software_release.py 校验 ZIP、检查或上传 R2 对象，并确认 R2 HEAD 与 bytes=0-0 返回 206；再确认 GitHub Release 附件名称、大小、状态和 digest；最后才写入并推送 R2-first software-manifest.json。脚本只打印包元数据，不打印 R2 密钥或其他凭据。
+发布顺序：双击 publish_software_release.bat，选择 ZIP 后由窗口后台执行 publish()：校验 ZIP、检查或上传 R2 对象，确认 CDN Range bytes=0-1048575 返回 206 并检查 ZIP 头；再检查 GitHub Release 和 tag，不存在则创建 Release、上传同一个 ZIP 并核对资产状态、大小和 digest；随后测试 GitHub v4 代理，最后才写入并推送 R2-first software-manifest.json，再核对远端 raw manifest。脚本只打印包元数据，不打印 R2 密钥或其他凭据。
 
-从 wogua 目录运行：
+从 wogua 目录双击：
+
+~~~text
+publish_software_release.bat
+~~~
+
+窗口操作顺序：
+
+1. 点击“选择 ZIP”，工具立即校验 ZIP 并显示版本、大小和 SHA-256。
+2. 点击“开始发布”，后台线程按完整流程执行并在日志窗口显示进度。
+3. 发布成功后窗口提示完成；失败时停止当前流程，不自动覆盖已有 Release 或 tag。
+
+命令行模式仍可使用：
 
 ~~~powershell
-..\Chosen\.venv\Scripts\python.exe publish_software_release.py Chosen2.10.zip --write-manifest software-manifest.json
+..\Chosen\.venv\Scripts\python.exe publish_software_release.py Chosen2.10.zip
 ~~~
 
 ZIP 不加入 Git。客户端最终先访问 R2，R2 不可用时按 manifest 中的 GitHub 代理备用地址下载。最终安装、退出、重启和升级结果由发布人手工验证。
@@ -48,14 +60,13 @@ ZIP 不加入 Git。客户端最终先访问 R2，R2 不可用时按 manifest �
 - ZIP 内部版本文件是 _internal/version.json。
 - 发布包已经完成既定裁剪和隐私清理。
 - 包内没有账号、token、密码、用户配置、开发机路径、日志、.git 或额外 ZIP。
-- GitHub CLI 已登录，并有目标仓库的推送和 Release 权限。
+- Git Credential Manager 已保存 GitHub token，并有目标仓库的推送和 Release 权限。
 - 发布版本、Release tag、manifest 和 ZIP 内容使用同一个版本号。
 
 检查 GitHub 登录、仓库、分支：
 
 ```powershell
 cd E:/ChosenSkin2.0/wogua
-gh auth status
 git remote -v
 git branch --show-current
 git status --short
@@ -200,7 +211,7 @@ if ($manifest.version -ne '2.10') { throw 'Manifest version mismatch' }
 if ($manifest.release_tag -ne 'v2.10') { throw 'Manifest release tag mismatch' }
 if ($manifest.size -ne $zip.Length) { throw 'Manifest size mismatch' }
 if ($manifest.sha256 -ne $hash) { throw 'Manifest SHA-256 mismatch' }
-if ($manifest.download_url -notmatch '/v2.10/Chosen2.10\.zip$') { throw 'Manifest URL mismatch' }
+if ($manifest.download_url -ne 'https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip') { throw 'Manifest URL mismatch' }
 if (@($manifest.download_url_backup).Count -lt 1) { throw 'Manifest backup URLs are missing' }
 Write-Output 'manifest_match=passed'
 ```
@@ -254,7 +265,14 @@ ac2ad44 release: publish Chosen 2.10 package
 
 ## 7. 创建 GitHub Release 并上传 ZIP
 
-先查看 Release 是否存在：
+脚本会自动完成以下步骤；命令行仅作为手动排障备用：
+
+1. 查询 Release 和 tag，任一已存在就停止，避免覆盖。
+2. 创建 Release。
+3. 上传同一个本地 ZIP，不重新压缩。
+4. 核对 uploaded、size 和 SHA-256 digest。
+
+手动查看 Release：
 
 ```powershell
 gh release view v2.10 --repo Chosen11111111/wogua
@@ -488,7 +506,7 @@ ZIP 保持未跟踪状态是正常的。不要为了清理 git status 删除它�
 - [ ] 远端 version、tag、size、sha256 正确。
 - [ ] 远端 URL 与 Release 附件一致。
 - [ ] 主 manifest 服务最终返回同一份数据。
-- [ ] R2 HEAD 和 bytes=0-0 返回值已核对。
+- [ ] R2/CDN HEAD 和 bytes=0-1048575 返回值已核对，GitHub v4 代理 Range 也已测试。
 - [ ] 发布人完成手工冒烟测试。
 
 ## 13. 本次 2.10 发布记录

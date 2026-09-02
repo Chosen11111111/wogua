@@ -1,4 +1,5 @@
 import hashlib
+import io
 import json
 import os
 import tempfile
@@ -13,6 +14,8 @@ from publish_software_release import (
     build_manifest,
     check_download_range,
     inspect_package,
+    publish,
+    publish_github_release,
     r2_object_key,
     r2_public_url,
     upload_to_r2,
@@ -46,13 +49,24 @@ class FakeR2Client:
 
 
 class FakeHttpResponse:
-    def __init__(self, status_code, headers):
+    def __init__(self, status_code, headers, body=None):
         self.status_code = status_code
         self.headers = headers
+        self.raw = io.BytesIO(body or b"")
         self.closed = False
 
     def close(self):
         self.closed = True
+
+
+class FakeJsonResponse:
+    def __init__(self, status_code, payload):
+        self.status_code = status_code
+        self.payload = payload
+        self.text = json.dumps(payload)
+
+    def json(self):
+        return self.payload
 
 
 class PublishSoftwareReleaseTests(unittest.TestCase):
@@ -136,7 +150,11 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
             path.unlink()
 
     def test_public_range_check_requires_206_and_exact_content_range(self):
-        response = FakeHttpResponse(206, {"Content-Range": "bytes 0-0/219176976", "Content-Length": "1"})
+        response = FakeHttpResponse(
+            206,
+            {"Content-Range": "bytes 0-1048575/219176976", "Content-Length": "1048576"},
+            b"PK\x03\x04" + b"x" * (1024 * 1024 - 4),
+        )
         result = check_download_range(
             "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
             219176976,
@@ -154,6 +172,135 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
                 http_get=lambda *args, **kwargs: response,
             )
         self.assertTrue(response.closed)
+
+    def test_publish_github_release_creates_release_and_uploads_zip(self):
+        path = self.make_valid_software_zip()
+        try:
+            info = inspect_package(path)
+            get_responses = [FakeJsonResponse(404, {}), FakeJsonResponse(404, {})]
+            get_calls = []
+            post_calls = []
+            release_payload = {
+                "tag_name": info.tag,
+                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + info.tag,
+                "upload_url": "https://uploads.github.com/repos/Chosen11111111/wogua/releases/1/assets{?name,label}",
+            }
+            asset_payload = {
+                "name": info.asset_name,
+                "state": "uploaded",
+                "size": info.size,
+                "digest": "sha256:" + info.sha256,
+            }
+
+            def fake_get(url, **kwargs):
+                get_calls.append((url, kwargs))
+                return get_responses.pop(0)
+
+            def fake_post(url, **kwargs):
+                post_calls.append((url, kwargs))
+                if url.endswith("/releases"):
+                    self.assertEqual(kwargs["json"]["tag_name"], info.tag)
+                    return FakeJsonResponse(201, release_payload)
+                self.assertIn("?name=" + info.asset_name, url)
+                self.assertEqual(kwargs["headers"]["Content-Type"], "application/zip")
+                self.assertEqual(kwargs["headers"]["Content-Length"], str(info.size))
+                self.assertEqual(kwargs["data"].read(), path.read_bytes())
+                return FakeJsonResponse(201, asset_payload)
+
+            result = publish_github_release(
+                info,
+                token="test-token",
+                request_get=fake_get,
+                request_post=fake_post,
+            )
+            self.assertTrue(result["created"])
+            self.assertTrue(result["uploaded"])
+            self.assertEqual(len(get_calls), 2)
+            self.assertEqual(len(post_calls), 2)
+        finally:
+            path.unlink()
+
+    def test_publish_github_release_stops_when_release_exists(self):
+        path = self.make_valid_software_zip()
+        try:
+            info = inspect_package(path)
+
+            def fake_get(url, **kwargs):
+                return FakeJsonResponse(200, {"tag_name": info.tag})
+
+            with self.assertRaises(ReleaseError):
+                publish_github_release(
+                    info,
+                    token="test-token",
+                    request_get=fake_get,
+                    request_post=lambda *args, **kwargs: self.fail("existing release must not upload"),
+                )
+        finally:
+            path.unlink()
+
+    def test_publish_runs_r2_github_proxy_and_manifest_in_order(self):
+        path = self.make_valid_software_zip()
+        try:
+            info = inspect_package(path)
+            r2_client = FakeR2Client()
+            range_calls = []
+            range_body = b"PK\x03\x04" + b"x" * (info.size - 4)
+
+            def fake_http(url, **kwargs):
+                range_calls.append((url, kwargs))
+                return FakeHttpResponse(
+                    206,
+                    {
+                        "Content-Range": f"bytes 0-{info.size - 1}/{info.size}",
+                        "Content-Length": str(info.size),
+                    },
+                    range_body,
+                )
+
+            github_get_responses = [FakeJsonResponse(404, {}), FakeJsonResponse(404, {})]
+            github_posts = []
+            release_payload = {
+                "tag_name": info.tag,
+                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + info.tag,
+                "upload_url": "https://uploads.github.com/repos/Chosen11111111/wogua/releases/1/assets{?name,label}",
+            }
+            asset_payload = {
+                "name": info.asset_name,
+                "state": "uploaded",
+                "size": info.size,
+                "digest": "sha256:" + info.sha256,
+            }
+
+            def fake_github_get(url, **kwargs):
+                return github_get_responses.pop(0)
+
+            def fake_github_post(url, **kwargs):
+                github_posts.append(url)
+                if url.endswith("/releases"):
+                    return FakeJsonResponse(201, release_payload)
+                return FakeJsonResponse(201, asset_payload)
+
+            with tempfile.TemporaryDirectory() as directory:
+                result = publish(
+                    path,
+                    Path(directory) / "software-manifest.json",
+                    client=r2_client,
+                    http_get=fake_http,
+                    token="test-token",
+                    github_get=fake_github_get,
+                    github_post=fake_github_post,
+                    log=lambda message: None,
+                    push_manifest=False,
+                    verify_remote_manifest=False,
+                )
+                self.assertTrue(result["github"]["uploaded"])
+                self.assertTrue((Path(directory) / "software-manifest.json").is_file())
+            self.assertEqual(r2_client.put_calls, 1)
+            self.assertEqual(len(range_calls), 2)
+            self.assertTrue(all(call[1]["headers"]["Range"] == f"bytes=0-{info.size - 1}" for call in range_calls))
+            self.assertEqual(len(github_posts), 2)
+        finally:
+            path.unlink()
 
     def test_write_manifest_uses_utf8_json_and_replaces_atomically(self):
         with tempfile.TemporaryDirectory() as directory:
