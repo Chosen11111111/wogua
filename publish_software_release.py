@@ -17,7 +17,7 @@ from urllib.parse import quote, urlsplit
 try:
     import requests
 except ImportError as exc:
-    raise SystemExit("缺少 requests，请使用 E:\ChosenSkin2.0\Chosen\.venv\Scripts\python.exe 运行") from exc
+    raise SystemExit("缺少 requests，请使用 E:\\ChosenSkin2.0\\Chosen\\.venv\\Scripts\\python.exe 运行") from exc
 
 ROOT = Path(__file__).resolve().parent
 CHOSEN_ROOT = ROOT.parent / "Chosen"
