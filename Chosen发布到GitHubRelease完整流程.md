@@ -1,56 +1,67 @@
 # Chosen 发布到 GitHub Release 完整流程
 
-本文记录 Chosen 软件包从本地 ZIP 到 R2、GitHub Release 和 manifest 的完整流程，明确 ZIP、R2 对象、Git 仓库和 Release 附件之间的边界。
+本文记录 Chosen **分层软件包**（full + app）从本地 ZIP 到 R2 / 香港节点 / GitHub Release / manifest 的完整流程。构建与验收总纲见 `E:/ChosenSkin2.0/Chosen/发版流程.md`。
 
-## 本次 2.10 软件包 R2 发布补充
+## 当前分层发布（必读）
 
-软件包对象和地址：
+一次发布必须准备两个 ZIP（版本号与 `runtime_version` 一致）：
 
-- R2 对象：wogua/Chosen2.10.zip
-- R2 公网地址：https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip
-- 主下载地址：R2 公网地址。
-- 备用下载地址：v4、cdn、v6 GitHub Release 代理，均指向 v2.10 的同一个附件。
+| 包 | 文件名示例 | 内容 | 托管 |
+|----|------------|------|------|
+| full | `Chosen2.16-full.zip` | 完整安装树（含 Qt/Python 运行时） | R2 `wogua/` + GitHub Release + 香港 `/wogua/` |
+| app | `Chosen2.16-app.zip` | 业务层：exe、updater、`_internal` 白名单目录等（**无** PySide6 等运行时） | GitHub Release 第二资产 + 香港 `/wogua-app/`（**不上 R2**） |
 
-发布顺序：双击 publish_software_release.bat，选择 ZIP 后由窗口后台执行 publish()：校验 ZIP、检查或上传 R2 对象，确认 CDN Range bytes=0-1048575 返回 206 并检查 ZIP 头；再检查 GitHub Release 和 tag，不存在则创建 Release、上传同一个 ZIP 并核对资产状态、大小和 digest；随后测试 GitHub v4 代理，最后才写入并推送 R2-first software-manifest.json，再核对远端 raw manifest。脚本只打印包元数据，不打印 R2 密钥或其他凭据。
+manifest 主下载一般为香港节点；full 的 backup 含 R2 与 GitHub 代理；app 的 backup 固定三条稳定代理（`gh-proxy.com` / `cdn.gh-proxy.org` / `v4.gh-proxy.org`）。两包的 `_internal/version.json` 必须含：
 
-从 wogua 目录双击：
+```json
+{ "version": "2.16", "runtime_version": "py314-pyside6-YYYYMMDD" }
+```
 
-~~~text
-publish_software_release.bat
-~~~
+仅当 PySide6/Python 运行时变更时才改 `runtime_version`；日常只改业务代码时保持不变，客户端才会走 app 薄包。
 
-窗口操作顺序：
+### 用脚本发布（推荐）
 
-1. 点击“选择 ZIP”，工具立即校验 ZIP 并显示版本、大小和 SHA-256。
-2. 点击“开始发布”，后台线程按完整流程执行并在日志窗口显示进度。
-3. 发布成功后窗口提示完成；失败时停止当前流程，不自动覆盖已有 Release 或 tag。
+双击：
 
-命令行模式仍可使用：
+```text
+E:\ChosenSkin2.0\wogua\publish_software_release.bat
+```
 
-~~~powershell
-..\Chosen\.venv\Scripts\python.exe publish_software_release.py Chosen2.10.zip
-~~~
+窗口操作：
 
-ZIP 不加入 Git。客户端最终先访问 R2，R2 不可用时按 manifest 中的 GitHub 代理备用地址下载。最终安装、退出、重启和升级结果由发布人手工验证。
+1. 选择 **full ZIP**，确认版本与 `runtime_version`。
+2. 选择 **app ZIP**，确认与 full 同版本、同 `runtime_version`。
+3. 点击「开始发布」；后台校验、上传、探测线路、推送 `software-manifest.json`。
+
+命令行：
+
+```powershell
+cd E:\ChosenSkin2.0\wogua
+..\Chosen\.venv\Scripts\python.exe publish_software_release.py `
+  --full-zip Chosen2.16-full.zip `
+  --app-zip Chosen2.16-app.zip
+```
+
+ZIP 不加入 Git。脚本只打印包元数据，不打印 R2 密钥。最终安装/退出/重启由发布人手工验证。
+
+> 旧文档中「只选一个 `Chosen2.10.zip`」的流程已废弃；当前脚本 **必须** 同时提供 full 与 app。
 
 ## 1. 发布对象
 
-一次软件发布包含两个云端对象：
+一次软件发布包含：
 
-1. GitHub Release 附件：真正供用户下载的 ZIP。
-2. 软件 manifest：告诉客户端当前版本、下载地址、文件大小和 SHA-256。
+1. GitHub Release 附件：`Chosen{ver}-full.zip` 与 `Chosen{ver}-app.zip`。
+2. 软件 manifest：版本、`runtime_version`、full/app 的 URL、大小与 SHA-256。
 
-本次仓库与文件：
+仓库与路径：
 
 - GitHub 仓库：https://github.com/Chosen11111111/wogua
 - 本地仓库：E:/ChosenSkin2.0/wogua
-- 发布目录：E:/ChosenSkin2.0/ChosenreleaseNew/Chosen2.10
-- 本地 ZIP：E:/ChosenSkin2.0/wogua/Chosen2.10.zip
+- 发布目录示例：E:/ChosenSkin2.0/ChosenreleaseNew/Chosen2.16
 - manifest：E:/ChosenSkin2.0/wogua/software-manifest.json
-- Release tag：v2.10
+- Release tag：`v{version}`（如 `v2.16`）
 
 > 重要：ZIP 不加入 Git 历史。GitHub 普通仓库单个文件上限是 100 MB；大于 100 MB 的软件包必须作为 GitHub Release 附件上传。manifest 加入 Git，ZIP 上传 Release。
-
 ## 2. 前置条件
 
 发布前确认：
