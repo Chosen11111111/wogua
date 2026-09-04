@@ -6,13 +6,19 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, call, patch
 
 from publish_software_release import (
+    HK_APP_OBJECT_PREFIX,
+    HK_OBJECT_PREFIX,
     PackageInfo,
     ReleaseError,
+    STABLE_APP_PROXY_PREFIXES,
     build_manifest,
     check_download_range,
+    hk_app_public_url,
+    hk_public_url,
+    inspect_app_package,
     inspect_package,
     publish,
     publish_github_release,
@@ -21,6 +27,8 @@ from publish_software_release import (
     upload_to_r2,
     write_manifest,
 )
+
+RUNTIME = "py314-pyside6-20260904"
 
 
 class FakeClientError(Exception):
@@ -70,16 +78,40 @@ class FakeJsonResponse:
 
 
 class PublishSoftwareReleaseTests(unittest.TestCase):
-    def make_valid_software_zip(self, version="2.10"):
-        handle = tempfile.NamedTemporaryFile(prefix="Chosen", suffix=".zip", delete=False)
+    def make_valid_software_zip(self, version="2.10", runtime_version=RUNTIME, name_prefix="Chosen"):
+        handle = tempfile.NamedTemporaryFile(prefix=name_prefix, suffix=".zip", delete=False)
         handle.close()
         path = Path(handle.name)
         with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
             archive.writestr("Chosen.exe", b"exe")
             archive.writestr("ChosenUpdater.exe", b"updater")
             archive.writestr("_internal/runtime.dat", b"runtime")
-            archive.writestr("_internal/version.json", json.dumps({"version": version}))
+            archive.writestr(
+                "_internal/version.json",
+                json.dumps({"version": version, "runtime_version": runtime_version}),
+            )
         return path
+
+    def make_valid_app_zip(self, version="2.10", runtime_version=RUNTIME, name_prefix="ChosenApp"):
+        handle = tempfile.NamedTemporaryFile(prefix=name_prefix, suffix=".zip", delete=False)
+        handle.close()
+        path = Path(handle.name)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("Chosen.exe", b"app executable")
+            archive.writestr("ChosenUpdater.exe", b"app updater")
+            archive.writestr(
+                "_internal/version.json",
+                json.dumps({"version": version, "runtime_version": runtime_version}),
+            )
+            archive.writestr("_internal/src/main.py", b"# app")
+            archive.writestr("_internal/ui/app.js", b"// ui")
+            archive.writestr("_internal/assets/logo.png", b"png")
+            archive.writestr("_internal/injection/hook.py", b"hook")
+            archive.writestr("_internal/Pengu Loader/loader.dll", b"loader")
+        return path
+
+    def package_info(self, name, size=219176976, digest="a" * 64, version="2.10", runtime_version=RUNTIME):
+        return PackageInfo(version, Path(name), size, digest, runtime_version)
 
     def test_inspect_package_reads_version_size_and_sha256(self):
         path = self.make_valid_software_zip()
@@ -87,9 +119,25 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
             info = inspect_package(path)
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             self.assertEqual(info.version, "2.10")
+            self.assertEqual(info.runtime_version, RUNTIME)
             self.assertEqual(info.archive_path, path.resolve())
             self.assertEqual(info.size, path.stat().st_size)
             self.assertEqual(info.sha256, digest)
+        finally:
+            path.unlink()
+
+    def test_inspect_package_rejects_missing_runtime_version(self):
+        handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        handle.close()
+        path = Path(handle.name)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("Chosen.exe", b"exe")
+            archive.writestr("ChosenUpdater.exe", b"updater")
+            archive.writestr("_internal/runtime.dat", b"runtime")
+            archive.writestr("_internal/version.json", json.dumps({"version": "2.10"}))
+        try:
+            with self.assertRaises(ReleaseError):
+                inspect_package(path)
         finally:
             path.unlink()
 
@@ -104,23 +152,63 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
         finally:
             path.unlink()
 
-    def test_r2_paths_use_wogua_prefix_and_versioned_asset_name(self):
-        info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
-        self.assertEqual(r2_object_key(info), "wogua/Chosen2.10.zip")
-        self.assertEqual(r2_public_url(info), "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip")
+    def test_inspect_app_package_accepts_whitelist_zip(self):
+        path = self.make_valid_app_zip()
+        try:
+            info = inspect_app_package(path)
+            self.assertEqual(info.version, "2.10")
+            self.assertEqual(info.runtime_version, RUNTIME)
+        finally:
+            path.unlink()
 
-    def test_build_manifest_puts_r2_first_and_github_proxies_after_it(self):
-        info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
-        manifest = build_manifest(info)
-        self.assertEqual(manifest["download_url"], "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip")
+    def test_inspect_app_package_rejects_incomplete_app(self):
+        handle = tempfile.NamedTemporaryFile(suffix=".zip", delete=False)
+        handle.close()
+        path = Path(handle.name)
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("Chosen.exe", b"exe")
+            archive.writestr("ChosenUpdater.exe", b"updater")
+            archive.writestr(
+                "_internal/version.json",
+                json.dumps({"version": "2.10", "runtime_version": RUNTIME}),
+            )
+            archive.writestr("_internal/src/main.py", b"# app")
+        try:
+            with self.assertRaises(ReleaseError):
+                inspect_app_package(path)
+        finally:
+            path.unlink()
+
+    def test_r2_paths_use_wogua_prefix_and_versioned_asset_name(self):
+        info = self.package_info("Chosen2.10-full.zip")
+        self.assertEqual(r2_object_key(info), "wogua/Chosen2.10-full.zip")
+        self.assertEqual(r2_public_url(info), "https://cdn.chosen.cc.cd/wogua/Chosen2.10-full.zip")
+
+    def test_build_manifest_puts_hk_first_and_layered_app_fields(self):
+        full = self.package_info("Chosen2.10-full.zip")
+        app = self.package_info("Chosen2.10-app.zip", size=35000000, digest="b" * 64)
+        manifest = build_manifest(full, app, RUNTIME)
+        self.assertEqual(manifest["version"], "2.10")
+        self.assertEqual(manifest["runtime_version"], RUNTIME)
+        self.assertEqual(manifest["download_url"], hk_public_url(full))
         self.assertEqual(manifest["size"], 219176976)
+        self.assertEqual(manifest["sha256"], "a" * 64)
         self.assertEqual(manifest["release_tag"], "v2.10")
-        self.assertEqual(len(manifest["download_url_backup"]), 3)
+        self.assertEqual(len(manifest["download_url_backup"]), 7)
+        self.assertEqual(manifest["download_url_backup"][0], "https://cdn.chosen.cc.cd/wogua/Chosen2.10-full.zip")
         self.assertTrue(all(url.startswith("https://") for url in manifest["download_url_backup"]))
-        self.assertTrue(all("releases/download/v2.10/Chosen2.10.zip" in url for url in manifest["download_url_backup"]))
+        self.assertEqual(manifest["app_download_url"], hk_app_public_url(app))
+        self.assertTrue(manifest["app_download_url"].endswith("/wogua-app/Chosen2.10-app.zip"))
+        self.assertEqual(manifest["app_size"], 35000000)
+        self.assertEqual(manifest["app_sha256"], "b" * 64)
+        self.assertEqual(
+            manifest["app_download_url_backup"],
+            [prefix + app.github_url for prefix in STABLE_APP_PROXY_PREFIXES],
+        )
+        self.assertEqual(len(manifest["app_download_url_backup"]), 3)
 
     def test_upload_to_r2_rejects_same_key_with_different_size(self):
-        info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
+        info = self.package_info("Chosen2.10-full.zip")
         client = FakeR2Client(existing_size=1)
         with patch.dict(os.environ, {"R2_BUCKET": "software"}, clear=False):
             with self.assertRaises(ReleaseError):
@@ -128,7 +216,7 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
         self.assertEqual(client.put_calls, 0)
 
     def test_upload_to_r2_keeps_same_size_object_without_overwrite(self):
-        info = PackageInfo("2.10", Path("Chosen2.10.zip"), 219176976, "a" * 64)
+        info = self.package_info("Chosen2.10-full.zip")
         client = FakeR2Client(existing_size=info.size)
         with patch.dict(os.environ, {"R2_BUCKET": "software"}, clear=False):
             result = upload_to_r2(info, client=client)
@@ -156,7 +244,7 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
             b"PK\x03\x04" + b"x" * (1024 * 1024 - 4),
         )
         result = check_download_range(
-            "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
+            "https://cdn.chosen.cc.cd/wogua/Chosen2.10-full.zip",
             219176976,
             http_get=lambda *args, **kwargs: response,
         )
@@ -167,29 +255,37 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
         response = FakeHttpResponse(200, {"Content-Length": "219176976"})
         with self.assertRaises(ReleaseError):
             check_download_range(
-                "https://cdn.chosen.cc.cd/wogua/Chosen2.10.zip",
+                "https://cdn.chosen.cc.cd/wogua/Chosen2.10-full.zip",
                 219176976,
                 http_get=lambda *args, **kwargs: response,
             )
         self.assertTrue(response.closed)
 
-    def test_publish_github_release_creates_release_and_uploads_zip(self):
-        path = self.make_valid_software_zip()
+    def test_publish_github_release_creates_release_and_uploads_both_zips(self):
+        full_path = self.make_valid_software_zip()
+        app_path = self.make_valid_app_zip()
         try:
-            info = inspect_package(path)
+            full = inspect_package(full_path)
+            app = inspect_app_package(app_path)
             get_responses = [FakeJsonResponse(404, {}), FakeJsonResponse(404, {})]
             get_calls = []
             post_calls = []
             release_payload = {
-                "tag_name": info.tag,
-                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + info.tag,
+                "tag_name": full.tag,
+                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + full.tag,
                 "upload_url": "https://uploads.github.com/repos/Chosen11111111/wogua/releases/1/assets{?name,label}",
             }
-            asset_payload = {
-                "name": info.asset_name,
+            full_asset = {
+                "name": full.asset_name,
                 "state": "uploaded",
-                "size": info.size,
-                "digest": "sha256:" + info.sha256,
+                "size": full.size,
+                "digest": "sha256:" + full.sha256,
+            }
+            app_asset = {
+                "name": app.asset_name,
+                "state": "uploaded",
+                "size": app.size,
+                "digest": "sha256:" + app.sha256,
             }
 
             def fake_get(url, **kwargs):
@@ -199,76 +295,99 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
             def fake_post(url, **kwargs):
                 post_calls.append((url, kwargs))
                 if url.endswith("/releases"):
-                    self.assertEqual(kwargs["json"]["tag_name"], info.tag)
+                    self.assertEqual(kwargs["json"]["tag_name"], full.tag)
                     return FakeJsonResponse(201, release_payload)
-                self.assertIn("?name=" + info.asset_name, url)
-                self.assertEqual(kwargs["headers"]["Content-Type"], "application/zip")
-                self.assertEqual(kwargs["headers"]["Content-Length"], str(info.size))
-                self.assertEqual(kwargs["data"].read(), path.read_bytes())
-                return FakeJsonResponse(201, asset_payload)
+                if f"name={full.asset_name}" in url:
+                    self.assertEqual(kwargs["headers"]["Content-Type"], "application/zip")
+                    self.assertEqual(kwargs["headers"]["Content-Length"], str(full.size))
+                    self.assertEqual(kwargs["data"].read(), full_path.read_bytes())
+                    return FakeJsonResponse(201, full_asset)
+                self.assertIn(f"name={app.asset_name}", url)
+                self.assertEqual(kwargs["data"].read(), app_path.read_bytes())
+                return FakeJsonResponse(201, app_asset)
 
             result = publish_github_release(
-                info,
+                full,
+                app,
                 token="test-token",
                 request_get=fake_get,
                 request_post=fake_post,
             )
             self.assertTrue(result["created"])
             self.assertTrue(result["uploaded"])
+            self.assertEqual(result["asset"]["name"], full.asset_name)
+            self.assertEqual(result["app_asset"]["name"], app.asset_name)
             self.assertEqual(len(get_calls), 2)
-            self.assertEqual(len(post_calls), 2)
+            self.assertEqual(len(post_calls), 3)
         finally:
-            path.unlink()
+            full_path.unlink()
+            app_path.unlink()
 
     def test_publish_github_release_stops_when_release_exists(self):
-        path = self.make_valid_software_zip()
+        full_path = self.make_valid_software_zip()
+        app_path = self.make_valid_app_zip()
         try:
-            info = inspect_package(path)
+            full = inspect_package(full_path)
+            app = inspect_app_package(app_path)
 
             def fake_get(url, **kwargs):
-                return FakeJsonResponse(200, {"tag_name": info.tag})
+                return FakeJsonResponse(200, {"tag_name": full.tag})
 
             with self.assertRaises(ReleaseError):
                 publish_github_release(
-                    info,
+                    full,
+                    app,
                     token="test-token",
                     request_get=fake_get,
                     request_post=lambda *args, **kwargs: self.fail("existing release must not upload"),
                 )
         finally:
-            path.unlink()
+            full_path.unlink()
+            app_path.unlink()
 
     def test_publish_runs_r2_github_proxy_and_manifest_in_order(self):
-        path = self.make_valid_software_zip()
+        full_path = self.make_valid_software_zip()
+        app_path = self.make_valid_app_zip()
         try:
-            info = inspect_package(path)
+            full = inspect_package(full_path)
+            app = inspect_app_package(app_path)
             r2_client = FakeR2Client()
             range_calls = []
-            range_body = b"PK\x03\x04" + b"x" * (info.size - 4)
 
             def fake_http(url, **kwargs):
-                range_calls.append((url, kwargs))
+                if app.github_url in url or f"/{HK_APP_OBJECT_PREFIX}/" in url:
+                    size = app.size
+                else:
+                    size = full.size
+                range_calls.append((url, kwargs, size))
+                body = b"PK\x03\x04" + b"x" * (size - 4)
                 return FakeHttpResponse(
                     206,
                     {
-                        "Content-Range": f"bytes 0-{info.size - 1}/{info.size}",
-                        "Content-Length": str(info.size),
+                        "Content-Range": f"bytes 0-{size - 1}/{size}",
+                        "Content-Length": str(size),
                     },
-                    range_body,
+                    body,
                 )
 
             github_get_responses = [FakeJsonResponse(404, {}), FakeJsonResponse(404, {})]
             github_posts = []
             release_payload = {
-                "tag_name": info.tag,
-                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + info.tag,
+                "tag_name": full.tag,
+                "html_url": "https://github.com/Chosen11111111/wogua/releases/tag/" + full.tag,
                 "upload_url": "https://uploads.github.com/repos/Chosen11111111/wogua/releases/1/assets{?name,label}",
             }
-            asset_payload = {
-                "name": info.asset_name,
+            full_asset = {
+                "name": full.asset_name,
                 "state": "uploaded",
-                "size": info.size,
-                "digest": "sha256:" + info.sha256,
+                "size": full.size,
+                "digest": "sha256:" + full.sha256,
+            }
+            app_asset = {
+                "name": app.asset_name,
+                "state": "uploaded",
+                "size": app.size,
+                "digest": "sha256:" + app.sha256,
             }
 
             def fake_github_get(url, **kwargs):
@@ -278,11 +397,16 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
                 github_posts.append(url)
                 if url.endswith("/releases"):
                     return FakeJsonResponse(201, release_payload)
-                return FakeJsonResponse(201, asset_payload)
+                if f"name={full.asset_name}" in url:
+                    return FakeJsonResponse(201, full_asset)
+                return FakeJsonResponse(201, app_asset)
 
-            with tempfile.TemporaryDirectory() as directory:
+            with tempfile.TemporaryDirectory() as directory, patch(
+                "publish_software_release.sync_to_hk_mirror"
+            ) as sync_hk:
                 result = publish(
-                    path,
+                    full_path,
+                    app_path,
                     Path(directory) / "software-manifest.json",
                     client=r2_client,
                     http_get=fake_http,
@@ -295,12 +419,44 @@ class PublishSoftwareReleaseTests(unittest.TestCase):
                 )
                 self.assertTrue(result["github"]["uploaded"])
                 self.assertTrue((Path(directory) / "software-manifest.json").is_file())
+                sync_hk.assert_has_calls(
+                    [
+                        call(full, log=ANY, object_prefix=HK_OBJECT_PREFIX),
+                        call(app, log=ANY, object_prefix=HK_APP_OBJECT_PREFIX),
+                    ],
+                    any_order=False,
+                )
+                self.assertEqual(sync_hk.call_count, 2)
             self.assertEqual(r2_client.put_calls, 1)
-            self.assertEqual(len(range_calls), 2)
-            self.assertTrue(all(call[1]["headers"]["Range"] == f"bytes=0-{info.size - 1}" for call in range_calls))
-            self.assertEqual(len(github_posts), 2)
+            self.assertEqual(r2_client.upload_args[2], "wogua/" + full.asset_name)
+            # CDN + full proxy + HK full + HK app + 3 app proxies
+            self.assertEqual(len(range_calls), 7)
+            self.assertEqual(len(github_posts), 3)
+            manifest = result["manifest"]
+            self.assertEqual(manifest["runtime_version"], RUNTIME)
+            self.assertEqual(manifest["app_download_url"], hk_app_public_url(app))
+            self.assertEqual(len(manifest["app_download_url_backup"]), 3)
         finally:
-            path.unlink()
+            full_path.unlink()
+            app_path.unlink()
+
+    def test_publish_rejects_mismatched_versions(self):
+        full_path = self.make_valid_software_zip(version="2.10")
+        app_path = self.make_valid_app_zip(version="2.11")
+        try:
+            with self.assertRaises(ReleaseError):
+                publish(
+                    full_path,
+                    app_path,
+                    None,
+                    client=FakeR2Client(),
+                    push_manifest=False,
+                    verify_remote_manifest=False,
+                    log=lambda message: None,
+                )
+        finally:
+            full_path.unlink()
+            app_path.unlink()
 
     def test_write_manifest_uses_utf8_json_and_replaces_atomically(self):
         with tempfile.TemporaryDirectory() as directory:
