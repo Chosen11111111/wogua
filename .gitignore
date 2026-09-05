@@ -1,0 +1,5 @@
+# 公开仓库：仅客户下载用的清单，不要提交发布工具或 ZIP
+*
+!.gitignore
+!software-manifest.json
+!README.md
