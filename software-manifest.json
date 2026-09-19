@@ -1,25 +1,25 @@
 {
-  "version": "2.27",
+  "version": "2.28",
   "runtime_version": "py314-pyside6-20260904",
-  "download_url": "https://download.52015002.xyz/wogua/Chosen2.27-full.zip",
+  "download_url": "https://download.52015002.xyz/wogua/Chosen2.28-full.zip",
   "download_url_backup": [
-    "https://cdn.chosen.cc.cd/wogua/Chosen2.27-full.zip",
-    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip",
-    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip",
-    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip",
-    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip",
-    "https://ghproxy.net/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip",
-    "https://ghfast.top/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-full.zip"
+    "https://cdn.chosen.cc.cd/wogua/Chosen2.28-full.zip",
+    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip",
+    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip",
+    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip",
+    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip",
+    "https://ghproxy.net/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip",
+    "https://ghfast.top/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-full.zip"
   ],
-  "size": 230923119,
-  "sha256": "0da13fadd1b03a8620c669b2c49167f9f9f3594db650921c276be0c63070def5",
-  "app_download_url": "https://download.52015002.xyz/wogua-app/Chosen2.27-app.zip",
+  "size": 230931435,
+  "sha256": "bad04dc43ae00cfd9d2e4fdeb7576fc888213f412eb89dc0fd1a148e808ca91f",
+  "app_download_url": "https://download.52015002.xyz/wogua-app/Chosen2.28-app.zip",
   "app_download_url_backup": [
-    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-app.zip",
-    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-app.zip",
-    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.27/Chosen2.27-app.zip"
+    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-app.zip",
+    "https://cdn.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-app.zip",
+    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.28/Chosen2.28-app.zip"
   ],
-  "app_size": 40055435,
-  "app_sha256": "9c5bdd9f67841ee60c291b440160485268e16e9e66721e293f52b7f2b9e61d87",
-  "release_tag": "v2.27"
+  "app_size": 40060075,
+  "app_sha256": "ce0c724a608f0a71d963e97686fa727ce738277a19fcef46f322d2a1c5c7b4a3",
+  "release_tag": "v2.28"
 }
