@@ -1,23 +1,23 @@
 {
-  "version": "2.31",
+  "version": "2.33",
   "runtime_version": "py314-pyside6-20260904",
-  "download_url": "https://cdn.52015002.xyz/wogua/Chosen2.31-full.zip",
+  "download_url": "https://cdn.52015002.xyz/wogua/Chosen2.33-full.zip",
   "download_url_backup": [
-    "https://download.52015002.xyz/wogua/Chosen2.31-full.zip",
-    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-full.zip",
-    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-full.zip",
-    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-full.zip"
+    "https://download.52015002.xyz/wogua/Chosen2.33-full.zip",
+    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-full.zip",
+    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-full.zip",
+    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-full.zip"
   ],
-  "size": 241456842,
-  "sha256": "ba08dec017949c5311a851075940dcaa32c87022236656a24061a3b5e08401c4",
-  "app_download_url": "https://cdn.52015002.xyz/wogua-app/Chosen2.31-app.zip",
+  "size": 240116870,
+  "sha256": "2480d1a33472f2eef9a03ca188381e1650d9f6ce4c00db4f64a3542af1bcf7de",
+  "app_download_url": "https://cdn.52015002.xyz/wogua-app/Chosen2.33-app.zip",
   "app_download_url_backup": [
-    "https://download.52015002.xyz/wogua-app/Chosen2.31-app.zip",
-    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-app.zip",
-    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-app.zip",
-    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.31/Chosen2.31-app.zip"
+    "https://download.52015002.xyz/wogua-app/Chosen2.33-app.zip",
+    "https://v4.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-app.zip",
+    "https://v6.gh-proxy.org/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-app.zip",
+    "https://gh-proxy.com/https://github.com/Chosen11111111/wogua/releases/download/v2.33/Chosen2.33-app.zip"
   ],
-  "app_size": 50585706,
-  "app_sha256": "4f9d1cbea3d236242cbb46d775d07b1c1cea6f2c102fbf4effb1c0108f14f10e",
-  "release_tag": "v2.31"
+  "app_size": 49247347,
+  "app_sha256": "a2099e09bafc3be70ed6be467764a4d16b5a8592cfc8f4ff38f3a2095a07827a",
+  "release_tag": "v2.33"
 }
